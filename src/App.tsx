@@ -1,16 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Heart, Plus, Edit2, Check, X, Gift, ShoppingBag, BookOpen, Sparkles, ExternalLink, Filter, Search, Upload, Camera } from 'lucide-react';
-
-interface Present {
-  id: string;
-  name: string;
-  price: string;
-  image: string;
-  category: string;
-  storeLink?: string;
-  received: boolean;
-  createdAt: string;
-}
+import { Heart, Plus, Edit2, Check, X, Gift, ShoppingBag, BookOpen, Sparkles, ExternalLink, Filter, Search, Upload, Camera, Star, Crown, Gem } from 'lucide-react';
+import { presentsService, Present } from './lib/supabase';
 
 const categories = [
   { id: 'all', name: 'Todos', icon: Gift },
@@ -21,56 +11,156 @@ const categories = [
   { id: 'outros', name: 'Outros', icon: Gift }
 ];
 
+const priorities = [
+  { 
+    id: 'sonho', 
+    name: 'Sonho dos Sonhos', 
+    icon: Crown, 
+    color: 'from-purple-400 to-pink-400',
+    bgColor: 'bg-purple-100',
+    textColor: 'text-purple-700',
+    description: '✨ O que mais desejo no mundo!'
+  },
+  { 
+    id: 'querido', 
+    name: 'Muito Querido', 
+    icon: Gem, 
+    color: 'from-pink-400 to-rose-400',
+    bgColor: 'bg-pink-100',
+    textColor: 'text-pink-700',
+    description: '💎 Seria incrível ganhar!'
+  },
+  { 
+    id: 'desejo', 
+    name: 'Desejo Fofo', 
+    icon: Star, 
+    color: 'from-rose-300 to-pink-300',
+    bgColor: 'bg-rose-100',
+    textColor: 'text-rose-700',
+    description: '⭐ Seria um mimo lindo!'
+  }
+];
+
 function App() {
   const [presents, setPresents] = useState<Present[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingPresent, setEditingPresent] = useState<Present | null>(null);
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [selectedPriority, setSelectedPriority] = useState('all');
   const [showReceived, setShowReceived] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Load presents from localStorage on mount
+  // Load presents from Supabase on mount
   useEffect(() => {
-    const savedPresents = localStorage.getItem('julia-presents');
-    if (savedPresents) {
-      setPresents(JSON.parse(savedPresents));
-    }
+    loadPresents();
   }, []);
 
-  // Save presents to localStorage whenever presents change
-  useEffect(() => {
-    localStorage.setItem('julia-presents', JSON.stringify(presents));
-  }, [presents]);
+  const loadPresents = async () => {
+    try {
+      setLoading(true);
+      const data = await presentsService.getAll();
+      setPresents(data);
+    } catch (error) {
+      console.error('Error loading presents:', error);
+      // Fallback to localStorage if Supabase fails
+      const savedPresents = localStorage.getItem('julia-presents');
+      if (savedPresents) {
+        setPresents(JSON.parse(savedPresents));
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filteredPresents = presents.filter(present => {
     const matchesCategory = selectedCategory === 'all' || present.category === selectedCategory;
+    const matchesPriority = selectedPriority === 'all' || present.priority === selectedPriority;
     const matchesStatus = showReceived || !present.received;
     const matchesSearch = present.name.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesCategory && matchesStatus && matchesSearch;
+    return matchesCategory && matchesPriority && matchesStatus && matchesSearch;
   });
 
-  const addPresent = (presentData: Omit<Present, 'id' | 'createdAt'>) => {
-    const newPresent: Present = {
-      ...presentData,
-      id: Date.now().toString(),
-      createdAt: new Date().toISOString()
-    };
-    setPresents([...presents, newPresent]);
+  const addPresent = async (presentData: Omit<Present, 'id' | 'created_at' | 'updated_at'>) => {
+    try {
+      const newPresent = await presentsService.create(presentData);
+      setPresents([newPresent, ...presents]);
+      // Backup to localStorage
+      localStorage.setItem('julia-presents', JSON.stringify([newPresent, ...presents]));
+    } catch (error) {
+      console.error('Error adding present:', error);
+      // Fallback to localStorage
+      const newPresent: Present = {
+        ...presentData,
+        id: Date.now().toString(),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+      const updatedPresents = [newPresent, ...presents];
+      setPresents(updatedPresents);
+      localStorage.setItem('julia-presents', JSON.stringify(updatedPresents));
+    }
   };
 
-  const updatePresent = (id: string, updates: Partial<Present>) => {
-    setPresents(presents.map(present => 
-      present.id === id ? { ...present, ...updates } : present
-    ));
+  const updatePresent = async (id: string, updates: Partial<Present>) => {
+    try {
+      const updatedPresent = await presentsService.update(id, updates);
+      const updatedPresents = presents.map(present => 
+        present.id === id ? updatedPresent : present
+      );
+      setPresents(updatedPresents);
+      // Backup to localStorage
+      localStorage.setItem('julia-presents', JSON.stringify(updatedPresents));
+    } catch (error) {
+      console.error('Error updating present:', error);
+      // Fallback to localStorage
+      const updatedPresents = presents.map(present => 
+        present.id === id ? { ...present, ...updates } : present
+      );
+      setPresents(updatedPresents);
+      localStorage.setItem('julia-presents', JSON.stringify(updatedPresents));
+    }
   };
 
-  const deletePresent = (id: string) => {
-    setPresents(presents.filter(present => present.id !== id));
+  const deletePresent = async (id: string) => {
+    try {
+      await presentsService.delete(id);
+      const updatedPresents = presents.filter(present => present.id !== id);
+      setPresents(updatedPresents);
+      // Backup to localStorage
+      localStorage.setItem('julia-presents', JSON.stringify(updatedPresents));
+    } catch (error) {
+      console.error('Error deleting present:', error);
+      // Fallback to localStorage
+      const updatedPresents = presents.filter(present => present.id !== id);
+      setPresents(updatedPresents);
+      localStorage.setItem('julia-presents', JSON.stringify(updatedPresents));
+    }
   };
 
   const toggleReceived = (id: string) => {
-    updatePresent(id, { received: !presents.find(p => p.id === id)?.received });
+    const present = presents.find(p => p.id === id);
+    if (present) {
+      updatePresent(id, { received: !present.received });
+    }
   };
+
+  const getPriorityInfo = (priority: string) => {
+    return priorities.find(p => p.id === priority) || priorities[1];
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-pink-50 via-rose-50 to-pink-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-pink-300 to-rose-400 flex items-center justify-center animate-pulse">
+            <Heart className="w-8 h-8 text-white" fill="currentColor" />
+          </div>
+          <p className="text-xl text-gray-600 font-light">Carregando os presentes da Júlia...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-pink-50 via-rose-50 to-pink-100">
@@ -134,7 +224,39 @@ function App() {
             })}
           </div>
 
-          {/* Status Filter */}
+          {/* Priority Filter */}
+          <div className="flex flex-wrap justify-center gap-2">
+            <button
+              onClick={() => setSelectedPriority('all')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-300 ${
+                selectedPriority === 'all'
+                  ? 'bg-gray-400 text-white shadow-lg scale-105'
+                  : 'bg-white/80 text-gray-600 hover:bg-gray-100 hover:scale-102'
+              }`}
+            >
+              <Filter className="w-4 h-4" />
+              <span className="text-sm font-medium">Todas Prioridades</span>
+            </button>
+            {priorities.map(priority => {
+              const Icon = priority.icon;
+              return (
+                <button
+                  key={priority.id}
+                  onClick={() => setSelectedPriority(priority.id)}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-300 ${
+                    selectedPriority === priority.id
+                      ? `bg-gradient-to-r ${priority.color} text-white shadow-lg scale-105`
+                      : `${priority.bgColor} ${priority.textColor} hover:scale-102`
+                  }`}
+                >
+                  <Icon className="w-4 h-4" />
+                  <span className="text-sm font-medium">{priority.name}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Status Filter and Add Button */}
           <div className="flex justify-center gap-4">
             <button
               onClick={() => setShowReceived(!showReceived)}
@@ -160,93 +282,104 @@ function App() {
 
         {/* Presents Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredPresents.map(present => (
-            <div
-              key={present.id}
-              className={`bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-2 group ${
-                present.received ? 'ring-2 ring-green-300' : ''
-              }`}
-            >
-              <div className="relative">
-                <div className="w-full h-48 bg-gradient-to-br from-pink-100 to-rose-100 rounded-t-2xl flex items-center justify-center overflow-hidden">
-                  {present.image ? (
-                    <img
-                      src={present.image}
-                      alt={present.name}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    />
-                  ) : (
-                    <Gift className="w-12 h-12 text-pink-400" />
-                  )}
-                </div>
-                
-                {present.received && (
-                  <div className="absolute top-3 right-3 bg-green-500 text-white px-3 py-1 rounded-full text-xs font-medium shadow-lg">
-                    ✓ Já ganhei!
-                  </div>
-                )}
-              </div>
-              
-              <div className="p-6">
-                <div className="flex justify-between items-start mb-3">
-                  <h3 className="text-lg font-semibold text-gray-800 group-hover:text-pink-600 transition-colors">
-                    {present.name}
-                  </h3>
-                  <span className="text-sm bg-pink-100 text-pink-600 px-2 py-1 rounded-full">
-                    {categories.find(c => c.id === present.category)?.name}
-                  </span>
-                </div>
-                
-                <p className="text-2xl font-bold text-gray-900 mb-4">
-                  R$ {present.price}
-                </p>
-                
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => toggleReceived(present.id)}
-                    className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-xl transition-all duration-300 ${
-                      present.received
-                        ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                        : 'bg-pink-100 text-pink-700 hover:bg-pink-200'
-                    }`}
-                  >
-                    {present.received ? (
-                      <>
-                        <Check className="w-4 h-4" />
-                        <span className="text-sm font-medium">Já ganhei</span>
-                      </>
+          {filteredPresents.map(present => {
+            const priorityInfo = getPriorityInfo(present.priority);
+            const PriorityIcon = priorityInfo.icon;
+            
+            return (
+              <div
+                key={present.id}
+                className={`bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-2 group ${
+                  present.received ? 'ring-2 ring-green-300' : ''
+                }`}
+              >
+                <div className="relative">
+                  <div className="w-full h-48 bg-gradient-to-br from-pink-100 to-rose-100 rounded-t-2xl flex items-center justify-center overflow-hidden">
+                    {present.image ? (
+                      <img
+                        src={present.image}
+                        alt={present.name}
+                        className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300 p-2"
+                      />
                     ) : (
-                      <>
-                        <Heart className="w-4 h-4" />
-                        <span className="text-sm font-medium">Ainda quero</span>
-                      </>
+                      <Gift className="w-12 h-12 text-pink-400" />
                     )}
-                  </button>
+                  </div>
                   
-                  <button
-                    onClick={() => {
-                      setEditingPresent(present);
-                      setShowModal(true);
-                    }}
-                    className="px-4 py-2 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-all duration-300"
-                  >
-                    <Edit2 className="w-4 h-4" />
-                  </button>
+                  {/* Priority Badge */}
+                  <div className={`absolute top-3 left-3 ${priorityInfo.bgColor} ${priorityInfo.textColor} px-3 py-1 rounded-full text-xs font-medium shadow-lg flex items-center gap-1`}>
+                    <PriorityIcon className="w-3 h-3" />
+                    <span>{priorityInfo.name}</span>
+                  </div>
                   
-                  {present.storeLink && (
-                    <a
-                      href={present.storeLink}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="px-4 py-2 bg-blue-100 text-blue-700 rounded-xl hover:bg-blue-200 transition-all duration-300"
-                    >
-                      <ExternalLink className="w-4 h-4" />
-                    </a>
+                  {present.received && (
+                    <div className="absolute top-3 right-3 bg-green-500 text-white px-3 py-1 rounded-full text-xs font-medium shadow-lg">
+                      ✓ Já ganhei!
+                    </div>
                   )}
                 </div>
+                
+                <div className="p-6">
+                  <div className="flex justify-between items-start mb-3">
+                    <h3 className="text-lg font-semibold text-gray-800 group-hover:text-pink-600 transition-colors">
+                      {present.name}
+                    </h3>
+                    <span className="text-sm bg-pink-100 text-pink-600 px-2 py-1 rounded-full">
+                      {categories.find(c => c.id === present.category)?.name}
+                    </span>
+                  </div>
+                  
+                  <p className="text-2xl font-bold text-gray-900 mb-4">
+                    R$ {present.price}
+                  </p>
+                  
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => toggleReceived(present.id)}
+                      className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-xl transition-all duration-300 ${
+                        present.received
+                          ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                          : 'bg-pink-100 text-pink-700 hover:bg-pink-200'
+                      }`}
+                    >
+                      {present.received ? (
+                        <>
+                          <Check className="w-4 h-4" />
+                          <span className="text-sm font-medium">Já ganhei</span>
+                        </>
+                      ) : (
+                        <>
+                          <Heart className="w-4 h-4" />
+                          <span className="text-sm font-medium">Ainda quero</span>
+                        </>
+                      )}
+                    </button>
+                    
+                    <button
+                      onClick={() => {
+                        setEditingPresent(present);
+                        setShowModal(true);
+                      }}
+                      className="px-4 py-2 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-all duration-300"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                    </button>
+                    
+                    {present.store_link && (
+                      <a
+                        href={present.store_link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-4 py-2 bg-blue-100 text-blue-700 rounded-xl hover:bg-blue-200 transition-all duration-300"
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                      </a>
+                    )}
+                  </div>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {filteredPresents.length === 0 && (
@@ -302,7 +435,7 @@ function PresentModal({
   onClose 
 }: {
   present: Present | null;
-  onSave: (data: Omit<Present, 'id' | 'createdAt'>) => void;
+  onSave: (data: Omit<Present, 'id' | 'created_at' | 'updated_at'>) => void;
   onDelete?: () => void;
   onClose: () => void;
 }) {
@@ -311,11 +444,12 @@ function PresentModal({
     price: present?.price || '',
     image: present?.image || '',
     category: present?.category || 'outros',
-    storeLink: present?.storeLink || '',
-    received: present?.received || false
+    store_link: present?.store_link || '',
+    received: present?.received || false,
+    priority: present?.priority || 'querido'
   });
   const [imagePreview, setImagePreview] = useState<string>(present?.image || '');
-  const [uploadMethod, setUploadMethod] = useState<'url' | 'upload'>('url');
+  const [uploadMethod, setUploadMethod] = useState<'url' | 'upload'>('upload');
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -346,6 +480,7 @@ function PresentModal({
     setFormData({...formData, image: url});
     setImagePreview(url);
   };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (formData.name && formData.price) {
@@ -359,6 +494,10 @@ function PresentModal({
       onDelete();
       onClose();
     }
+  };
+
+  const getPriorityInfo = (priority: string) => {
+    return priorities.find(p => p.id === priority) || priorities[1];
   };
 
   return (
@@ -421,6 +560,35 @@ function PresentModal({
                   </option>
                 ))}
               </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-3">
+                Prioridade *
+              </label>
+              <div className="grid grid-cols-1 gap-3">
+                {priorities.map(priority => {
+                  const Icon = priority.icon;
+                  return (
+                    <button
+                      key={priority.id}
+                      type="button"
+                      onClick={() => setFormData({...formData, priority: priority.id})}
+                      className={`p-4 rounded-xl border-2 transition-all duration-300 text-left ${
+                        formData.priority === priority.id
+                          ? `border-pink-400 bg-gradient-to-r ${priority.color} text-white shadow-lg`
+                          : `border-gray-200 ${priority.bgColor} ${priority.textColor} hover:border-pink-300`
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 mb-2">
+                        <Icon className="w-5 h-5" />
+                        <span className="font-semibold">{priority.name}</span>
+                      </div>
+                      <p className="text-sm opacity-90">{priority.description}</p>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             <div>
@@ -494,11 +662,11 @@ function PresentModal({
               {imagePreview && (
                 <div className="mt-4">
                   <p className="text-sm font-medium text-gray-700 mb-2">Preview:</p>
-                  <div className="relative w-full h-32 bg-gray-100 rounded-xl overflow-hidden">
+                  <div className="relative w-full h-48 bg-gray-100 rounded-xl overflow-hidden">
                     <img
                       src={imagePreview}
                       alt="Preview"
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-contain p-2"
                       onError={() => {
                         setImagePreview('');
                         if (uploadMethod === 'url') {
@@ -527,8 +695,8 @@ function PresentModal({
               </label>
               <input
                 type="url"
-                value={formData.storeLink}
-                onChange={(e) => setFormData({...formData, storeLink: e.target.value})}
+                value={formData.store_link}
+                onChange={(e) => setFormData({...formData, store_link: e.target.value})}
                 className="w-full px-4 py-3 border-2 border-pink-200 rounded-xl focus:border-pink-400 focus:outline-none transition-colors"
                 placeholder="https://loja.com/produto"
               />
