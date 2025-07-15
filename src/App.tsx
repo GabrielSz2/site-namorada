@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Heart, Plus, Edit2, Check, X, Gift, ShoppingBag, BookOpen, Sparkles, ExternalLink, Filter, Search, Upload, Camera, Star, Crown, Gem } from 'lucide-react';
-import { presentsService, Present } from './lib/supabase';
+import { presentsService, Present, supabase, isSupabaseConfigured } from './lib/supabase';
 
 const categories = [
   { id: 'all', name: 'Todos', icon: Gift },
@@ -54,6 +54,39 @@ function App() {
   // Load presents from Supabase on mount
   useEffect(() => {
     loadPresents();
+    
+    // Set up real-time subscription only if Supabase is configured
+    if (isSupabaseConfigured) {
+      const channel = supabase!
+        .channel('presents_changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'presents'
+          },
+          (payload) => {
+            console.log('Real-time update:', payload);
+            
+            if (payload.eventType === 'INSERT') {
+              setPresents(prev => [payload.new as Present, ...prev]);
+            } else if (payload.eventType === 'UPDATE') {
+              setPresents(prev => prev.map(present => 
+                present.id === payload.new.id ? payload.new as Present : present
+              ));
+            } else if (payload.eventType === 'DELETE') {
+              setPresents(prev => prev.filter(present => present.id !== payload.old.id));
+            }
+          }
+        )
+        .subscribe();
+
+      // Cleanup subscription on unmount
+      return () => {
+        supabase!.removeChannel(channel);
+      };
+    }
   }, []);
 
   const loadPresents = async () => {
@@ -63,11 +96,6 @@ function App() {
       setPresents(data);
     } catch (error) {
       console.error('Error loading presents:', error);
-      // Fallback to localStorage if Supabase fails
-      const savedPresents = localStorage.getItem('julia-presents');
-      if (savedPresents) {
-        setPresents(JSON.parse(savedPresents));
-      }
     } finally {
       setLoading(false);
     }
@@ -84,57 +112,32 @@ function App() {
   const addPresent = async (presentData: Omit<Present, 'id' | 'created_at' | 'updated_at'>) => {
     try {
       const newPresent = await presentsService.create(presentData);
-      setPresents([newPresent, ...presents]);
-      // Backup to localStorage
-      localStorage.setItem('julia-presents', JSON.stringify([newPresent, ...presents]));
+      // Always update the UI immediately for better user experience
+      setPresents(prev => [newPresent, ...prev]);
     } catch (error) {
       console.error('Error adding present:', error);
-      // Fallback to localStorage
-      const newPresent: Present = {
-        ...presentData,
-        id: Date.now().toString(),
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      };
-      const updatedPresents = [newPresent, ...presents];
-      setPresents(updatedPresents);
-      localStorage.setItem('julia-presents', JSON.stringify(updatedPresents));
     }
   };
 
   const updatePresent = async (id: string, updates: Partial<Present>) => {
     try {
       const updatedPresent = await presentsService.update(id, updates);
-      const updatedPresents = presents.map(present => 
+      // Always update the UI immediately for better user experience
+      setPresents(prev => prev.map(present => 
         present.id === id ? updatedPresent : present
-      );
-      setPresents(updatedPresents);
-      // Backup to localStorage
-      localStorage.setItem('julia-presents', JSON.stringify(updatedPresents));
+      ));
     } catch (error) {
       console.error('Error updating present:', error);
-      // Fallback to localStorage
-      const updatedPresents = presents.map(present => 
-        present.id === id ? { ...present, ...updates } : present
-      );
-      setPresents(updatedPresents);
-      localStorage.setItem('julia-presents', JSON.stringify(updatedPresents));
     }
   };
 
   const deletePresent = async (id: string) => {
     try {
       await presentsService.delete(id);
-      const updatedPresents = presents.filter(present => present.id !== id);
-      setPresents(updatedPresents);
-      // Backup to localStorage
-      localStorage.setItem('julia-presents', JSON.stringify(updatedPresents));
+      // Always update the UI immediately for better user experience
+      setPresents(prev => prev.filter(present => present.id !== id));
     } catch (error) {
       console.error('Error deleting present:', error);
-      // Fallback to localStorage
-      const updatedPresents = presents.filter(present => present.id !== id);
-      setPresents(updatedPresents);
-      localStorage.setItem('julia-presents', JSON.stringify(updatedPresents));
     }
   };
 
