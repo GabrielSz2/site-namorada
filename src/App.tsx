@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Heart, Plus, Edit2, Check, X, Gift, ShoppingBag, BookOpen, Sparkles, ExternalLink, Filter, Search, Upload, Camera, Star, Crown, Gem } from 'lucide-react';
-import { presentsService, Present, supabase, isSupabaseConfigured } from './lib/supabase';
+import { presentsService, Present, supabase } from './lib/supabase';
 
 const categories = [
   { id: 'all', name: 'Todos', icon: Gift },
@@ -53,6 +53,7 @@ function App() {
 
   useEffect(() => {
     console.log('🚀 Inicializando aplicação...');
+    console.log('🔧 Conectando ao Supabase...');
     loadPresents();
     
     // Configurar tempo real
@@ -70,7 +71,10 @@ function App() {
           
           if (payload.eventType === 'INSERT') {
             console.log('➕ Novo presente adicionado:', payload.new);
-            setPresents(prev => [payload.new as Present, ...prev]);
+            setPresents(prev => {
+              const exists = prev.some(p => p.id === payload.new.id);
+              return exists ? prev : [payload.new as Present, ...prev];
+            });
           } else if (payload.eventType === 'UPDATE') {
             console.log('✏️ Presente atualizado:', payload.new);
             setPresents(prev => prev.map(present => 
@@ -83,11 +87,13 @@ function App() {
         }
       )
       .subscribe((status) => {
-        console.log('📡 Tempo real ativo:', status);
+        console.log('📡 Status do tempo real:', status);
       });
 
     return () => {
-      supabase.removeChannel(channel);
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
     };
   }, []);
 
@@ -98,6 +104,7 @@ function App() {
       setPresents(data);
     } catch (error) {
       console.error('Error loading presents:', error);
+      alert('Erro ao carregar presentes. Verifique a conexão.');
     } finally {
       setLoading(false);
     }

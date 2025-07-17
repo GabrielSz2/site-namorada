@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-// Always create the Supabase client - it will use the current configured account
+// Create Supabase client
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export interface Present {
@@ -33,12 +33,12 @@ export const presentsService = {
       throw error;
     }
     
-    console.log('✅ Presentes carregados:', data?.length || 0);
+    console.log('✅ Presentes carregados do Supabase:', data?.length || 0);
     return data || [];
   },
 
   async create(present: Omit<Present, 'id' | 'created_at' | 'updated_at'>): Promise<Present> {
-    console.log('➕ Criando presente:', present.name);
+    console.log('➕ Criando presente no Supabase:', present.name);
     
     const { data, error } = await supabase
       .from('presents')
@@ -47,16 +47,16 @@ export const presentsService = {
       .single();
     
     if (error) {
-      console.error('❌ Erro ao criar presente:', error);
+      console.error('❌ Erro ao criar presente no Supabase:', error);
       throw error;
     }
     
-    console.log('✅ Presente criado:', data.name);
+    console.log('✅ Presente criado no Supabase:', data.name);
     return data;
   },
 
   async update(id: string, updates: Partial<Present>): Promise<Present> {
-    console.log('✏️ Atualizando presente:', id);
+    console.log('✏️ Atualizando presente no Supabase:', id);
     
     const { data, error } = await supabase
       .from('presents')
@@ -66,16 +66,16 @@ export const presentsService = {
       .single();
     
     if (error) {
-      console.error('❌ Erro ao atualizar presente:', error);
+      console.error('❌ Erro ao atualizar presente no Supabase:', error);
       throw error;
     }
     
-    console.log('✅ Presente atualizado:', data.name);
+    console.log('✅ Presente atualizado no Supabase:', data.name);
     return data;
   },
 
   async delete(id: string): Promise<void> {
-    console.log('🗑️ Deletando presente:', id);
+    console.log('🗑️ Deletando presente no Supabase:', id);
     
     const { error } = await supabase
       .from('presents')
@@ -83,10 +83,10 @@ export const presentsService = {
       .eq('id', id);
     
     if (error) {
-      console.error('❌ Erro ao deletar presente:', error);
+      console.error('❌ Erro ao deletar presente no Supabase:', error);
       throw error;
     }
     
-    console.log('✅ Presente deletado com sucesso');
+    console.log('✅ Presente deletado do Supabase com sucesso');
   }
 };
