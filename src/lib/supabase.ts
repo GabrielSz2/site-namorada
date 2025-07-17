@@ -3,22 +3,8 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-// Check if Supabase is properly configured
-const isSupabaseConfigured = Boolean(
-  supabaseUrl && 
-  supabaseAnonKey && 
-  supabaseUrl !== 'your_supabase_project_url' && 
-  supabaseAnonKey !== 'your_supabase_anon_key' &&
-  supabaseUrl.includes('supabase.co')
-);
-
-if (!isSupabaseConfigured) {
-  console.error('❌ Supabase não configurado! Configure as variáveis de ambiente VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY');
-}
-
-export const supabase = isSupabaseConfigured 
-  ? createClient(supabaseUrl, supabaseAnonKey)
-  : null;
+// Always create the Supabase client - it will use the current configured account
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export interface Present {
   id: string;
@@ -35,10 +21,8 @@ export interface Present {
 
 export const presentsService = {
   async getAll(): Promise<Present[]> {
-    if (!supabase) {
-      throw new Error('Supabase não configurado. Configure as variáveis de ambiente.');
-    }
-
+    console.log('🔍 Buscando presentes do Supabase...');
+    
     const { data, error } = await supabase
       .from('presents')
       .select('*')
@@ -49,14 +33,13 @@ export const presentsService = {
       throw error;
     }
     
+    console.log('✅ Presentes carregados:', data?.length || 0);
     return data || [];
   },
 
   async create(present: Omit<Present, 'id' | 'created_at' | 'updated_at'>): Promise<Present> {
-    if (!supabase) {
-      throw new Error('Supabase não configurado. Configure as variáveis de ambiente.');
-    }
-
+    console.log('➕ Criando presente:', present.name);
+    
     const { data, error } = await supabase
       .from('presents')
       .insert([present])
@@ -68,14 +51,13 @@ export const presentsService = {
       throw error;
     }
     
+    console.log('✅ Presente criado:', data.name);
     return data;
   },
 
   async update(id: string, updates: Partial<Present>): Promise<Present> {
-    if (!supabase) {
-      throw new Error('Supabase não configurado. Configure as variáveis de ambiente.');
-    }
-
+    console.log('✏️ Atualizando presente:', id);
+    
     const { data, error } = await supabase
       .from('presents')
       .update(updates)
@@ -88,14 +70,13 @@ export const presentsService = {
       throw error;
     }
     
+    console.log('✅ Presente atualizado:', data.name);
     return data;
   },
 
   async delete(id: string): Promise<void> {
-    if (!supabase) {
-      throw new Error('Supabase não configurado. Configure as variáveis de ambiente.');
-    }
-
+    console.log('🗑️ Deletando presente:', id);
+    
     const { error } = await supabase
       .from('presents')
       .delete()
@@ -105,8 +86,7 @@ export const presentsService = {
       console.error('❌ Erro ao deletar presente:', error);
       throw error;
     }
+    
+    console.log('✅ Presente deletado com sucesso');
   }
 };
-
-// Export configuration status for components to use
-export { isSupabaseConfigured };
