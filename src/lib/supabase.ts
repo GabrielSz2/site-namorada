@@ -12,6 +12,10 @@ const isSupabaseConfigured = Boolean(
   supabaseUrl.includes('supabase.co')
 );
 
+if (!isSupabaseConfigured) {
+  console.error('❌ Supabase não configurado! Configure as variáveis de ambiente VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY');
+}
+
 export const supabase = isSupabaseConfigured 
   ? createClient(supabaseUrl, supabaseAnonKey)
   : null;
@@ -29,161 +33,77 @@ export interface Present {
   updated_at: string;
 }
 
-// LocalStorage fallback functions
-const localStorageKey = 'julia-presents';
-
-const localStorageService = {
-  getAll(): Present[] {
-    try {
-      const data = localStorage.getItem(localStorageKey);
-      return data ? JSON.parse(data) : [];
-    } catch {
-      return [];
-    }
-  },
-
-  save(presents: Present[]): void {
-    try {
-      localStorage.setItem(localStorageKey, JSON.stringify(presents));
-    } catch (error) {
-      console.error('Error saving to localStorage:', error);
-    }
-  },
-
-  create(present: Omit<Present, 'id' | 'created_at' | 'updated_at'>): Present {
-    const presents = this.getAll();
-    const newPresent: Present = {
-      ...present,
-      id: crypto.randomUUID(),
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    };
-    presents.unshift(newPresent);
-    this.save(presents);
-    return newPresent;
-  },
-
-  update(id: string, updates: Partial<Present>): Present | null {
-    const presents = this.getAll();
-    const index = presents.findIndex(p => p.id === id);
-    if (index === -1) return null;
-    
-    presents[index] = {
-      ...presents[index],
-      ...updates,
-      updated_at: new Date().toISOString()
-    };
-    this.save(presents);
-    return presents[index];
-  },
-
-  delete(id: string): boolean {
-    const presents = this.getAll();
-    const filtered = presents.filter(p => p.id !== id);
-    if (filtered.length === presents.length) return false;
-    this.save(filtered);
-    return true;
-  }
-};
-
 export const presentsService = {
   async getAll(): Promise<Present[]> {
-    if (!isSupabaseConfigured) {
-      return localStorageService.getAll();
+    if (!supabase) {
+      throw new Error('Supabase não configurado. Configure as variáveis de ambiente.');
     }
 
-    try {
-      const { data, error } = await supabase
-        .from('presents')
-        .select('*')
-        .order('created_at', { ascending: false });
-      
-      if (error) {
-        console.error('Error fetching presents:', error);
-        throw error;
-      }
-      
-      return data || [];
-    } catch (error) {
-      console.error('Supabase error, falling back to localStorage:', error);
-      return localStorageService.getAll();
+    const { data, error } = await supabase
+      .from('presents')
+      .select('*')
+      .order('created_at', { ascending: false });
+    
+    if (error) {
+      console.error('❌ Erro ao buscar presentes:', error);
+      throw error;
     }
+    
+    return data || [];
   },
 
   async create(present: Omit<Present, 'id' | 'created_at' | 'updated_at'>): Promise<Present> {
-    if (!isSupabaseConfigured) {
-      return localStorageService.create(present);
+    if (!supabase) {
+      throw new Error('Supabase não configurado. Configure as variáveis de ambiente.');
     }
 
-    try {
-      const { data, error } = await supabase
-        .from('presents')
-        .insert([present])
-        .select()
-        .single();
-      
-      if (error) {
-        console.error('Error creating present:', error);
-        throw error;
-      }
-      
-      return data;
-    } catch (error) {
-      console.error('Supabase error, falling back to localStorage:', error);
-      return localStorageService.create(present);
+    const { data, error } = await supabase
+      .from('presents')
+      .insert([present])
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('❌ Erro ao criar presente:', error);
+      throw error;
     }
+    
+    return data;
   },
 
   async update(id: string, updates: Partial<Present>): Promise<Present> {
-    if (!isSupabaseConfigured) {
-      const result = localStorageService.update(id, updates);
-      if (!result) throw new Error('Present not found');
-      return result;
+    if (!supabase) {
+      throw new Error('Supabase não configurado. Configure as variáveis de ambiente.');
     }
 
-    try {
-      const { data, error } = await supabase
-        .from('presents')
-        .update(updates)
-        .eq('id', id)
-        .select()
-        .single();
-      
-      if (error) {
-        console.error('Error updating present:', error);
-        throw error;
-      }
-      
-      return data;
-    } catch (error) {
-      console.error('Supabase error, falling back to localStorage:', error);
-      const result = localStorageService.update(id, updates);
-      if (!result) throw new Error('Present not found');
-      return result;
+    const { data, error } = await supabase
+      .from('presents')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('❌ Erro ao atualizar presente:', error);
+      throw error;
     }
+    
+    return data;
   },
 
   async delete(id: string): Promise<void> {
-    if (!isSupabaseConfigured) {
-      const success = localStorageService.delete(id);
-      if (!success) throw new Error('Present not found');
-      return;
+    if (!supabase) {
+      throw new Error('Supabase não configurado. Configure as variáveis de ambiente.');
     }
 
-    try {
-      const { error } = await supabase
-        .from('presents')
-        .delete()
-        .eq('id', id);
-      
-      if (error) {
-        console.error('Error deleting present:', error);
-        throw error;
-      }
-    } catch (error) {
-      console.error('Supabase error, falling back to localStorage:', error);
-      const success = localStorageService.delete(id);
-      if (!success) throw new Error('Present not found');
+    const { error } = await supabase
+      .from('presents')
+      .delete()
+      .eq('id', id);
+    
+    if (error) {
+      console.error('❌ Erro ao deletar presente:', error);
+      throw error;
     }
   }
 };

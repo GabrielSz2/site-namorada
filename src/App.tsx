@@ -53,40 +53,50 @@ function App() {
 
   // Load presents from Supabase on mount
   useEffect(() => {
+    if (!isSupabaseConfigured) {
+      console.error('❌ Supabase não configurado! Clique em "Connect to Supabase" no canto superior direito.');
+      setLoading(false);
+      return;
+    }
+
     loadPresents();
     
-    // Set up real-time subscription only if Supabase is configured
-    if (isSupabaseConfigured) {
-      const channel = supabase!
-        .channel('presents_changes')
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'presents'
-          },
-          (payload) => {
-            console.log('Real-time update:', payload);
-            
-            if (payload.eventType === 'INSERT') {
-              setPresents(prev => [payload.new as Present, ...prev]);
-            } else if (payload.eventType === 'UPDATE') {
-              setPresents(prev => prev.map(present => 
-                present.id === payload.new.id ? payload.new as Present : present
-              ));
-            } else if (payload.eventType === 'DELETE') {
-              setPresents(prev => prev.filter(present => present.id !== payload.old.id));
-            }
+    // Set up real-time subscription
+    const channel = supabase!
+      .channel('presents_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'presents'
+        },
+        (payload) => {
+          console.log('🔄 Atualização em tempo real:', payload);
+          
+          if (payload.eventType === 'INSERT') {
+            console.log('➕ Novo presente adicionado:', payload.new);
+            setPresents(prev => [payload.new as Present, ...prev]);
+          } else if (payload.eventType === 'UPDATE') {
+            console.log('✏️ Presente atualizado:', payload.new);
+            setPresents(prev => prev.map(present => 
+              present.id === payload.new.id ? payload.new as Present : present
+            ));
+          } else if (payload.eventType === 'DELETE') {
+            console.log('🗑️ Presente removido:', payload.old);
+            setPresents(prev => prev.filter(present => present.id !== payload.old.id));
           }
-        )
-        .subscribe();
+        }
+      )
+      .subscribe((status) => {
+        console.log('📡 Status da conexão em tempo real:', status);
+      });
 
-      // Cleanup subscription on unmount
-      return () => {
-        supabase!.removeChannel(channel);
-      };
-    }
+    // Cleanup subscription on unmount
+    return () => {
+      console.log('🔌 Desconectando tempo real...');
+      supabase!.removeChannel(channel);
+    };
   }, []);
 
   const loadPresents = async () => {
@@ -111,33 +121,46 @@ function App() {
 
   const addPresent = async (presentData: Omit<Present, 'id' | 'created_at' | 'updated_at'>) => {
     try {
+      console.log('➕ Adicionando presente:', presentData);
       const newPresent = await presentsService.create(presentData);
-      // Always update the UI immediately for better user experience
-      setPresents(prev => [newPresent, ...prev]);
+      console.log('✅ Presente adicionado com sucesso:', newPresent);
+      // O tempo real vai atualizar automaticamente, mas vamos atualizar imediatamente também
+      setPresents(prev => {
+        // Evita duplicatas
+        const exists = prev.some(p => p.id === newPresent.id);
+        return exists ? prev : [newPresent, ...prev];
+      });
     } catch (error) {
-      console.error('Error adding present:', error);
+      console.error('❌ Erro ao adicionar presente:', error);
+      alert('Erro ao adicionar presente. Verifique se o Supabase está configurado.');
     }
   };
 
   const updatePresent = async (id: string, updates: Partial<Present>) => {
     try {
+      console.log('✏️ Atualizando presente:', id, updates);
       const updatedPresent = await presentsService.update(id, updates);
-      // Always update the UI immediately for better user experience
+      console.log('✅ Presente atualizado com sucesso:', updatedPresent);
+      // O tempo real vai atualizar automaticamente, mas vamos atualizar imediatamente também
       setPresents(prev => prev.map(present => 
         present.id === id ? updatedPresent : present
       ));
     } catch (error) {
-      console.error('Error updating present:', error);
+      console.error('❌ Erro ao atualizar presente:', error);
+      alert('Erro ao atualizar presente. Verifique se o Supabase está configurado.');
     }
   };
 
   const deletePresent = async (id: string) => {
     try {
+      console.log('🗑️ Deletando presente:', id);
       await presentsService.delete(id);
-      // Always update the UI immediately for better user experience
+      console.log('✅ Presente deletado com sucesso');
+      // O tempo real vai atualizar automaticamente, mas vamos atualizar imediatamente também
       setPresents(prev => prev.filter(present => present.id !== id));
     } catch (error) {
-      console.error('Error deleting present:', error);
+      console.error('❌ Erro ao deletar presente:', error);
+      alert('Erro ao deletar presente. Verifique se o Supabase está configurado.');
     }
   };
 
@@ -159,7 +182,30 @@ function App() {
           <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-pink-300 to-rose-400 flex items-center justify-center animate-pulse">
             <Heart className="w-8 h-8 text-white" fill="currentColor" />
           </div>
-          <p className="text-xl text-gray-600 font-light">Carregando os presentes da Júlia...</p>
+          <p className="text-xl text-gray-600 font-light">
+            {isSupabaseConfigured ? 'Carregando os presentes da Júlia...' : 'Configure o Supabase para continuar...'}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show configuration message if Supabase is not configured
+  if (!isSupabaseConfigured) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-pink-50 via-rose-50 to-pink-100 flex items-center justify-center">
+        <div className="text-center max-w-md mx-auto p-8">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-red-300 to-pink-400 flex items-center justify-center">
+            <Heart className="w-8 h-8 text-white" fill="currentColor" />
+          </div>
+          <h1 className="text-2xl font-bold text-gray-800 mb-4">Supabase Não Configurado</h1>
+          <p className="text-gray-600 mb-6">
+            Para usar a lista de presentes em tempo real, você precisa configurar o Supabase.
+          </p>
+          <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 text-left text-sm text-gray-700">
+            <p className="font-semibold mb-2">Clique no botão "Connect to Supabase" no canto superior direito</p>
+            <p>Isso vai configurar automaticamente o banco de dados e ativar a sincronização em tempo real!</p>
+          </div>
         </div>
       </div>
     );
