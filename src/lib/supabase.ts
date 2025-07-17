@@ -1,9 +1,10 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+// Configurações diretas do Supabase
+const supabaseUrl = 'https://busipvpnosnuozkixclx.supabase.co';
+const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ1c2lwdnBub3NudW96a2l4Y2x4Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MjU0MDA2MywiZXhwIjoyMDY4MTE2MDYzfQ.6VIwDf__pwNGd-ppsjZXMKaN60x1EdFagzoiIMFTv20';
 
-// Create Supabase client
+// Criar cliente Supabase
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export interface Present {
