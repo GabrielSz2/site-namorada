@@ -89,7 +89,6 @@ const localStorageService = {
 export const presentsService = {
   async getAll(): Promise<Present[]> {
     if (!isSupabaseConfigured) {
-      console.log('Supabase not configured. Using localStorage fallback.');
       return localStorageService.getAll();
     }
 
