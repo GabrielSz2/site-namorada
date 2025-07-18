@@ -14,6 +14,7 @@ export interface Present {
   image: string;
   category: string;
   store_link?: string;
+  observation?: string;
   received: boolean;
   priority: 'sonho' | 'querido' | 'desejo';
   created_at: string;

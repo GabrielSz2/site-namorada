@@ -4,11 +4,11 @@ import { presentsService, Present, supabase } from './lib/supabase';
 
 const categories = [
   { id: 'all', name: 'Todos', icon: Gift },
+  { id: 'utensilios', name: 'Utensílios', icon: BookOpen },
   { id: 'moda', name: 'Moda', icon: ShoppingBag },
+  { id: 'outros', name: 'Outros', icon: Gift },
   { id: 'beleza', name: 'Beleza', icon: Sparkles },
-  { id: 'livros', name: 'Livros', icon: BookOpen },
-  { id: 'acessorios', name: 'Acessórios', icon: Heart },
-  { id: 'outros', name: 'Outros', icon: Gift }
+  { id: 'acessorios', name: 'Acessórios', icon: Heart }
 ];
 
 const priorities = [
@@ -350,6 +350,18 @@ function App() {
                     R$ {present.price}
                   </p>
                   
+                  {present.observation && (
+                    <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-xl">
+                      <div className="flex items-start gap-2">
+                        <Sparkles className="w-4 h-4 text-yellow-600 mt-0.5 flex-shrink-0" />
+                        <div>
+                          <p className="text-sm font-medium text-yellow-800 mb-1">Observação:</p>
+                          <p className="text-sm text-yellow-700 whitespace-pre-wrap">{present.observation}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
                   <div className="flex gap-2">
                     <button
                       onClick={() => toggleReceived(present.id)}
@@ -462,6 +474,7 @@ function PresentModal({
     image: present?.image || '',
     category: present?.category || 'outros',
     store_link: present?.store_link || '',
+    observation: present?.observation || '',
     received: present?.received || false,
     priority: present?.priority || 'querido'
   });
@@ -704,6 +717,22 @@ function PresentModal({
                   </div>
                 </div>
               )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Observações
+              </label>
+              <textarea
+                value={formData.observation}
+                onChange={(e) => setFormData({...formData, observation: e.target.value})}
+                className="w-full px-4 py-3 border-2 border-pink-200 rounded-xl focus:border-pink-400 focus:outline-none transition-colors resize-none"
+                placeholder="Ex: Cupom DESCONTO10, cor preferida rosa, tamanho M..."
+                rows={3}
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                💡 Use este campo para cupons de desconto, cores preferidas, tamanhos, etc.
+              </p>
             </div>
 
             <div>
